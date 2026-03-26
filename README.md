@@ -72,12 +72,12 @@ Get the engine running locally in a few steps:
 
 ```bash
 # 1. Clone the repository
-git clone <repository_url>
+git clone [<repository_url>](https://github.com/SM-Pravin/Fin-anlyzer.git)
 
 # 2. Navigate to the project directory
-cd <project_directory>
+cd fin-anlyzer
 
-# 3. Create and activate a virtual environment
+# 3. navigate to the vertical you want to use Create and activate a virtual environment 
 python -m venv venv
 source venv/bin/activate  # On Windows use: venv\Scripts\activate
 
@@ -85,5 +85,5 @@ source venv/bin/activate  # On Windows use: venv\Scripts\activate
 pip install -r requirements.txt
 
 # 5. Initialize the database and launch the application
-python manage.py migrate
-python run.py
+vertical 1:   uvicorn backend.main:app 
+vertical 2:  uvicorn backend.main:app --reload --host 0.0.0.0 --port 8080
