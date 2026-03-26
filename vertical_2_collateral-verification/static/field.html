@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VaultVerify – Field Agent</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <a href="/static/field.html" class="topbar-brand">🔐 VaultVerify</a>
+      <div class="topbar-user">
+        <span class="text-sm">Field Agent</span>
+        <span id="topbar-username"></span>
+        <button class="btn btn-outline btn-sm" onclick="logout()">Sign Out</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="page-title">
+        <h1>Physical Inspection Queue</h1>
+        <p>Assets approved for physical verification. Record measurements and certify below.</p>
+      </div>
+
+      <div id="alert-container"></div>
+
+      <!-- Stats row -->
+      <div style="display:flex; gap:16px; margin-bottom:28px;">
+        <div class="card" style="flex:1; padding:16px 20px; margin-bottom:0;">
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.5px;">Awaiting Inspection</div>
+          <div id="stat-count" style="font-size:26px;font-weight:700;margin-top:4px;">—</div>
+        </div>
+        <div class="card" style="flex:1; padding:16px 20px; margin-bottom:0;">
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.5px;">Queue Status</div>
+          <div id="stat-status" style="font-size:14px;font-weight:500;margin-top:8px;">Loading…</div>
+        </div>
+        <div style="flex:1; display:flex; align-items:center; justify-content:flex-end;">
+          <button class="btn btn-outline btn-sm" onclick="loadQueue()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Cards container -->
+      <div id="assets-container">
+        <div class="empty-state">Loading queue…</div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Gold Certify Modal -->
+  <div class="modal-overlay" id="gold-modal">
+    <div class="modal">
+      <h3>Certify Gold Asset</h3>
+      <p class="text-sm text-muted" style="margin-bottom:16px;">
+        Record the physically measured weight and tested purity to issue a certificate.
+      </p>
+      <input type="hidden" id="gold-modal-asset-id" />
+
+      <div class="form-group">
+        <label for="gold-modal-weight">Measured Weight (grams) *</label>
+        <input type="number" id="gold-modal-weight" placeholder="e.g. 98.3" min="0.01" step="0.01" />
+      </div>
+      <div class="form-group">
+        <label for="gold-modal-purity">Tested Purity *</label>
+        <select id="gold-modal-purity">
+          <option value="">Select tested purity</option>
+          <option value="24K">24K (99.9%)</option>
+          <option value="22K">22K (91.6%)</option>
+          <option value="18K">18K (75.0%)</option>
+          <option value="14K">14K (58.3%)</option>
+          <option value="Below 14K">Below 14K</option>
+        </select>
+      </div>
+
+      <div id="gold-modal-alert"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-sm" onclick="closeModal('gold-modal')">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="gold-certify-btn" onclick="certifyGold()">
+          Issue Certificate
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Land Certify Modal -->
+  <div class="modal-overlay" id="land-modal">
+    <div class="modal">
+      <h3>Certify Land Asset</h3>
+      <p class="text-sm text-muted" style="margin-bottom:16px;">
+        Record the verified GPS coordinates from the physical site visit.
+      </p>
+      <input type="hidden" id="land-modal-asset-id" />
+
+      <div class="form-group">
+        <label for="land-modal-lat">Verified GPS Latitude *</label>
+        <input type="number" id="land-modal-lat" placeholder="e.g. 13.0827" step="0.000001" />
+      </div>
+      <div class="form-group">
+        <label for="land-modal-long">Verified GPS Longitude *</label>
+        <input type="number" id="land-modal-long" placeholder="e.g. 80.2707" step="0.000001" />
+      </div>
+
+      <div id="land-modal-alert"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-sm" onclick="closeModal('land-modal')">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="land-certify-btn" onclick="certifyLand()">
+          Issue Certificate
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    requireAuth();
+    document.getElementById('topbar-username').textContent =
+      localStorage.getItem('username') || 'agent';
+
+    window.onload = loadQueue;
+
+    async function loadQueue() {
+      const container = document.getElementById('assets-container');
+      container.innerHTML = '<div class="empty-state">Loading…</div>';
+
+      try {
+        const res  = await authFetch('/api/field/queue');
+        const data = await res.json();
+
+        if (!res.ok) {
+          showAlert('alert-container', data.detail || 'Failed to load queue.', 'error');
+          container.innerHTML = '<div class="empty-state">Error loading data.</div>';
+          return;
+        }
+
+        document.getElementById('stat-count').textContent  = data.length;
+        document.getElementById('stat-status').textContent =
+          data.length === 0 ? '✓ All clear — no pending inspections' : `${data.length} item(s) awaiting inspection`;
+
+        if (data.length === 0) {
+          container.innerHTML = '<div class="empty-state">No assets pending physical inspection.</div>';
+          return;
+        }
+
+        container.innerHTML = '';
+        for (const asset of data) {
+          const el = document.createElement('div');
+          el.className = 'card';
+          el.innerHTML = buildCard(asset);
+          container.appendChild(el);
+        }
+      } catch (err) {
+        showAlert('alert-container', 'Network error. Could not load queue.', 'error');
+        container.innerHTML = '<div class="empty-state">Network error.</div>';
+      }
+    }
+
+    function buildCard(asset) {
+      const isGold = asset.asset_type === 'gold';
+      const typeIcon = isGold ? '🥇' : '🏞';
+
+      let detailsHtml = '';
+      if (isGold) {
+        detailsHtml = `
+          <span>⚖ Declared: <strong>${asset.declared_weight}g</strong></span>
+          <span>✨ Purity: <strong>${escHtml(asset.declared_purity)}</strong></span>
+          <span>🔷 Form: <strong>${escHtml(asset.structure)}</strong></span>
+        `;
+      } else {
+        detailsHtml = `
+          <span>📍 ${escHtml(asset.property_address || '—')}</span>
+          <span>🌐 GPS: <strong>${asset.gps_lat}, ${asset.gps_long}</strong></span>
+          <span>📐 Size: <strong>${asset.declared_size} sq.ft</strong></span>
+          <span>🏷 Use: <strong>${escHtml(asset.land_use_type || '—')}</strong></span>
+        `;
+      }
+
+      return `
+        <div class="card-header">
+          <div>
+            <h3>${typeIcon} ${escHtml(asset.applicant_name)}</h3>
+            <div class="card-meta">
+              <span>PAN: <code class="font-mono">${escHtml(asset.pan_number)}</code></span>
+              <span>Submitted: ${formatDate(asset.submitted_at)}</span>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; flex-shrink:0;">
+            ${statusBadge(asset.status)}
+          </div>
+        </div>
+
+        <div class="card-meta" style="margin-bottom:12px;">${detailsHtml}</div>
+
+        <div style="margin-bottom:14px;">
+          <span class="text-xs text-muted" style="display:block;margin-bottom:6px;">Supporting Documents</span>
+          ${docLinks(asset.document_urls)}
+        </div>
+
+        <hr class="divider" style="margin:14px 0;" />
+
+        <div class="flex gap-2">
+          <button class="btn btn-primary btn-sm"
+            onclick="openCertifyModal('${asset.id}', '${asset.asset_type}')">
+            ✔ Record &amp; Certify
+          </button>
+        </div>
+      `;
+    }
+
+    /* ---- Modal helpers ---- */
+    function openCertifyModal(assetId, assetType) {
+      if (assetType === 'gold') {
+        document.getElementById('gold-modal-asset-id').value = assetId;
+        document.getElementById('gold-modal-weight').value   = '';
+        document.getElementById('gold-modal-purity').value   = '';
+        document.getElementById('gold-modal-alert').innerHTML = '';
+        document.getElementById('gold-modal').classList.add('open');
+      } else {
+        document.getElementById('land-modal-asset-id').value = assetId;
+        document.getElementById('land-modal-lat').value      = '';
+        document.getElementById('land-modal-long').value     = '';
+        document.getElementById('land-modal-alert').innerHTML = '';
+        document.getElementById('land-modal').classList.add('open');
+      }
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('open');
+    }
+
+    /* ---- Certify Gold ---- */
+    async function certifyGold() {
+      const assetId = document.getElementById('gold-modal-asset-id').value;
+      const weight  = document.getElementById('gold-modal-weight').value;
+      const purity  = document.getElementById('gold-modal-purity').value;
+
+      if (!weight || parseFloat(weight) <= 0) {
+        document.getElementById('gold-modal-alert').innerHTML =
+          '<div class="alert alert-error">Please enter a valid measured weight.</div>';
+        return;
+      }
+      if (!purity) {
+        document.getElementById('gold-modal-alert').innerHTML =
+          '<div class="alert alert-error">Please select the tested purity.</div>';
+        return;
+      }
+
+      const btn = document.getElementById('gold-certify-btn');
+      btn.disabled = true; btn.textContent = 'Issuing…';
+
+      try {
+        const res  = await authFetch(`/api/field/certify/gold/${assetId}`, {
+          method:  'PUT',
+          body:    JSON.stringify({ measured_weight: parseFloat(weight), tested_purity: purity }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          document.getElementById('gold-modal-alert').innerHTML =
+            `<div class="alert alert-error">${data.detail || 'Certification failed.'}</div>`;
+          return;
+        }
+
+        closeModal('gold-modal');
+        showAlert('alert-container', data.message, 'success');
+        loadQueue();
+      } catch (err) {
+        document.getElementById('gold-modal-alert').innerHTML =
+          '<div class="alert alert-error">Network error.</div>';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Issue Certificate';
+      }
+    }
+
+    /* ---- Certify Land ---- */
+    async function certifyLand() {
+      const assetId = document.getElementById('land-modal-asset-id').value;
+      const lat     = document.getElementById('land-modal-lat').value;
+      const lng     = document.getElementById('land-modal-long').value;
+
+      if (!lat) {
+        document.getElementById('land-modal-alert').innerHTML =
+          '<div class="alert alert-error">Please enter the verified GPS latitude.</div>';
+        return;
+      }
+      if (!lng) {
+        document.getElementById('land-modal-alert').innerHTML =
+          '<div class="alert alert-error">Please enter the verified GPS longitude.</div>';
+        return;
+      }
+
+      const btn = document.getElementById('land-certify-btn');
+      btn.disabled = true; btn.textContent = 'Issuing…';
+
+      try {
+        const res  = await authFetch(`/api/field/certify/land/${assetId}`, {
+          method: 'PUT',
+          body:   JSON.stringify({ verified_gps_lat: parseFloat(lat), verified_gps_long: parseFloat(lng) }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          document.getElementById('land-modal-alert').innerHTML =
+            `<div class="alert alert-error">${data.detail || 'Certification failed.'}</div>`;
+          return;
+        }
+
+        closeModal('land-modal');
+        showAlert('alert-container', data.message, 'success');
+        loadQueue();
+      } catch (err) {
+        document.getElementById('land-modal-alert').innerHTML =
+          '<div class="alert alert-error">Network error.</div>';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Issue Certificate';
+      }
+    }
+
+    /* ---- Utility ---- */
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  </script>
+</body>
+</html>

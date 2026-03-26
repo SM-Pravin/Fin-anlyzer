@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VaultVerify – Admin Review</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <a href="/static/admin.html" class="topbar-brand">🔐 VaultVerify</a>
+      <div class="topbar-user">
+        <span class="text-sm">Admin Desk</span>
+        <span id="topbar-username"></span>
+        <button class="btn btn-outline btn-sm" onclick="logout()">Sign Out</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="page-title">
+        <h1>Digital Review Queue</h1>
+        <p>Assets awaiting desk verification before physical inspection is dispatched.</p>
+      </div>
+
+      <div id="alert-container"></div>
+
+      <!-- Stats row -->
+      <div style="display:flex; gap:16px; margin-bottom:28px;">
+        <div class="card" style="flex:1; padding:16px 20px; margin-bottom:0;">
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.5px;">Pending Review</div>
+          <div id="stat-count" style="font-size:26px;font-weight:700;margin-top:4px;">—</div>
+        </div>
+        <div class="card" style="flex:1; padding:16px 20px; margin-bottom:0;">
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.5px;">Queue Status</div>
+          <div id="stat-status" style="font-size:14px;font-weight:500;margin-top:8px;">Loading…</div>
+        </div>
+        <div style="flex:1; display:flex; align-items:center; justify-content:flex-end;">
+          <button class="btn btn-outline btn-sm" onclick="loadQueue()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Table container -->
+      <div class="card" style="padding:0; overflow:hidden;">
+        <table class="data-table" id="queue-table">
+          <thead>
+            <tr>
+              <th>Applicant</th>
+              <th>PAN</th>
+              <th>Type</th>
+              <th>Details</th>
+              <th>Documents</th>
+              <th>Submitted</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="queue-body">
+            <tr>
+              <td colspan="7" class="empty-state">Loading queue…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div class="modal-overlay" id="confirm-modal">
+    <div class="modal">
+      <h3 id="modal-title">Confirm Action</h3>
+      <p id="modal-body" class="text-sm text-muted"></p>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-sm" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-sm" id="modal-confirm-btn" onclick="confirmAction()">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    requireAuth();
+    document.getElementById('topbar-username').textContent =
+      localStorage.getItem('username') || 'admin';
+
+    let _pendingAction = null;  // { action: 'approve'|'reject', id: str, name: str }
+
+    /* ---- Load queue on page load ---- */
+    window.onload = loadQueue;
+
+    async function loadQueue() {
+      const tbody = document.getElementById('queue-body');
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Loading…</td></tr>';
+
+      try {
+        const res  = await authFetch('/api/admin/queue');
+        const data = await res.json();
+
+        if (!res.ok) {
+          showAlert('alert-container', data.detail || 'Failed to load queue.', 'error');
+          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Error loading data.</td></tr>';
+          return;
+        }
+
+        document.getElementById('stat-count').textContent  = data.length;
+        document.getElementById('stat-status').textContent =
+          data.length === 0 ? '✓ All clear — no pending items' : `${data.length} item(s) require review`;
+
+        if (data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No assets pending digital review.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = '';
+        for (const asset of data) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = buildRow(asset);
+          tbody.appendChild(tr);
+        }
+      } catch (err) {
+        showAlert('alert-container', 'Network error. Could not load queue.', 'error');
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Network error.</td></tr>';
+      }
+    }
+
+    function buildRow(asset) {
+      const details = asset.asset_type === 'gold'
+        ? `<span class="text-sm">${asset.declared_weight}g &middot; ${asset.declared_purity} &middot; ${asset.structure}</span>`
+        : `<span class="text-sm">${asset.property_address || '—'}<br><span class="text-xs text-muted">${asset.gps_lat}, ${asset.gps_long}</span></span>`;
+
+      const typeBadge = asset.asset_type === 'gold'
+        ? '<span class="badge badge-pending">🥇 Gold</span>'
+        : '<span class="badge badge-physical">🏞 Land</span>';
+
+      return `
+        <td><strong>${escHtml(asset.applicant_name)}</strong></td>
+        <td><code class="font-mono text-sm">${escHtml(asset.pan_number)}</code></td>
+        <td>${typeBadge}</td>
+        <td>${details}</td>
+        <td>${docLinks(asset.document_urls)}</td>
+        <td class="text-sm text-muted">${formatDate(asset.submitted_at)}</td>
+        <td>
+          <div class="flex gap-2">
+            <button class="btn btn-primary btn-sm" onclick="openModal('approve','${asset.id}','${escAttr(asset.applicant_name)}')">
+              Approve
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="openModal('reject','${asset.id}','${escAttr(asset.applicant_name)}')">
+              Reject
+            </button>
+          </div>
+        </td>
+      `;
+    }
+
+    /* ---- Modal helpers ---- */
+    function openModal(action, id, name) {
+      _pendingAction = { action, id, name };
+      const isApprove = action === 'approve';
+      document.getElementById('modal-title').textContent =
+        isApprove ? 'Approve Asset' : 'Reject Asset';
+      document.getElementById('modal-body').textContent =
+        isApprove
+          ? `Send "${name}"'s submission to the field agent queue for physical inspection?`
+          : `Permanently reject "${name}"'s submission? This cannot be undone.`;
+
+      const btn = document.getElementById('modal-confirm-btn');
+      btn.textContent  = isApprove ? 'Yes, Approve' : 'Yes, Reject';
+      btn.className    = isApprove ? 'btn btn-primary btn-sm' : 'btn btn-danger btn-sm';
+
+      document.getElementById('confirm-modal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('confirm-modal').classList.remove('open');
+      _pendingAction = null;
+    }
+
+    async function confirmAction() {
+      if (!_pendingAction) return;
+      const { action, id } = _pendingAction;
+      closeModal();
+
+      const endpoint = action === 'approve'
+        ? `/api/admin/approve/${id}`
+        : `/api/admin/reject/${id}`;
+
+      try {
+        const res  = await authFetch(endpoint, { method: 'PUT' });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showAlert('alert-container', data.detail || 'Action failed.', 'error');
+          return;
+        }
+        showAlert('alert-container', data.message, 'success');
+        loadQueue();    // refresh table
+      } catch (err) {
+        showAlert('alert-container', 'Network error.', 'error');
+      }
+    }
+
+    /* ---- Utility ---- */
+    function escHtml(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function escAttr(s)  { return String(s).replace(/'/g,'&#39;'); }
+  </script>
+</body>
+</html>

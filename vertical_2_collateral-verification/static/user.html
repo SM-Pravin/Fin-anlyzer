@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VaultVerify – Submit Asset</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <a href="/static/user.html" class="topbar-brand">🔐 VaultVerify</a>
+      <div class="topbar-user">
+        <span id="topbar-username"></span>
+        <button class="btn btn-outline btn-sm" onclick="logout()">Sign Out</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="page-title">
+        <h1>Submit Collateral Asset</h1>
+        <p>Fill in the details below and upload supporting documents for verification.</p>
+      </div>
+
+      <div id="alert-container"></div>
+
+      <!-- Tab Bar -->
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tab-gold-btn" onclick="switchTab('gold')">Gold Asset</button>
+        <button class="tab-btn"        id="tab-land-btn" onclick="switchTab('land')">Land Asset</button>
+      </div>
+
+      <!-- ======================== GOLD FORM ======================== -->
+      <div class="tab-panel active" id="tab-gold">
+        <div class="card">
+          <h2 style="margin-bottom:20px;">Gold Asset Details</h2>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="gold-applicant">Applicant Name *</label>
+              <input type="text" id="gold-applicant" placeholder="Full legal name" />
+            </div>
+            <div class="form-group">
+              <label for="gold-pan">PAN Number *</label>
+              <input type="text" id="gold-pan" placeholder="e.g. ABCDE1234F" maxlength="10" style="text-transform:uppercase" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="gold-weight">Declared Weight (grams) *</label>
+              <input type="number" id="gold-weight" placeholder="e.g. 100.5" min="0.01" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label for="gold-purity">Declared Purity *</label>
+              <select id="gold-purity">
+                <option value="">Select purity</option>
+                <option value="24K">24K (99.9%)</option>
+                <option value="22K">22K (91.6%)</option>
+                <option value="18K">18K (75.0%)</option>
+                <option value="14K">14K (58.3%)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="gold-structure">Structure / Form *</label>
+            <select id="gold-structure">
+              <option value="">Select structure</option>
+              <option value="Coins">Coins</option>
+              <option value="Bars">Bars</option>
+              <option value="Jewellery">Jewellery</option>
+              <option value="Biscuits">Biscuits</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="gold-files">Supporting Documents * <span class="text-muted text-sm">(PDF, JPG, PNG – multiple allowed)</span></label>
+            <input type="file" id="gold-files" multiple accept=".pdf,.jpg,.jpeg,.png" />
+          </div>
+
+          <button class="btn btn-primary" id="gold-submit-btn" onclick="submitGold()">
+            Submit Gold Asset
+          </button>
+        </div>
+      </div>
+
+      <!-- ======================== LAND FORM ======================== -->
+      <div class="tab-panel" id="tab-land">
+        <div class="card">
+          <h2 style="margin-bottom:20px;">Land Asset Details</h2>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="land-applicant">Applicant Name *</label>
+              <input type="text" id="land-applicant" placeholder="Full legal name" />
+            </div>
+            <div class="form-group">
+              <label for="land-pan">PAN Number *</label>
+              <input type="text" id="land-pan" placeholder="e.g. ABCDE1234F" maxlength="10" style="text-transform:uppercase" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="land-address">Property Address *</label>
+            <textarea id="land-address" rows="2" placeholder="Full property address including survey number"></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="land-lat">GPS Latitude *</label>
+              <input type="number" id="land-lat" placeholder="e.g. 13.0827" step="0.000001" />
+            </div>
+            <div class="form-group">
+              <label for="land-long">GPS Longitude *</label>
+              <input type="number" id="land-long" placeholder="e.g. 80.2707" step="0.000001" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="land-size">Declared Size (sq. ft.) *</label>
+              <input type="number" id="land-size" placeholder="e.g. 2400" min="1" step="1" />
+            </div>
+            <div class="form-group">
+              <label for="land-use">Land Use Type *</label>
+              <select id="land-use">
+                <option value="">Select land use</option>
+                <option value="Residential">Residential</option>
+                <option value="Commercial">Commercial</option>
+                <option value="Agricultural">Agricultural</option>
+                <option value="Industrial">Industrial</option>
+                <option value="Mixed Use">Mixed Use</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="land-files">Supporting Documents * <span class="text-muted text-sm">(PDF, JPG, PNG – multiple allowed)</span></label>
+            <input type="file" id="land-files" multiple accept=".pdf,.jpg,.jpeg,.png" />
+          </div>
+
+          <button class="btn btn-primary" id="land-submit-btn" onclick="submitLand()">
+            Submit Land Asset
+          </button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    requireAuth();
+    document.getElementById('topbar-username').textContent =
+      localStorage.getItem('username') || 'User';
+
+    /* ---- Tab switching ---- */
+    function switchTab(tab) {
+      document.getElementById('tab-gold').classList.toggle('active', tab === 'gold');
+      document.getElementById('tab-land').classList.toggle('active', tab === 'land');
+      document.getElementById('tab-gold-btn').classList.toggle('active', tab === 'gold');
+      document.getElementById('tab-land-btn').classList.toggle('active', tab === 'land');
+      document.getElementById('alert-container').innerHTML = '';
+    }
+
+    /* ---- Gold submission ---- */
+    async function submitGold() {
+      const applicant = document.getElementById('gold-applicant').value.trim();
+      const pan       = document.getElementById('gold-pan').value.trim().toUpperCase();
+      const weight    = document.getElementById('gold-weight').value;
+      const purity    = document.getElementById('gold-purity').value;
+      const structure = document.getElementById('gold-structure').value;
+      const filesEl   = document.getElementById('gold-files');
+
+      if (!applicant)       { alert('Please enter the applicant name.');       return; }
+      if (!pan)             { alert('Please enter the PAN number.');            return; }
+      if (!weight || parseFloat(weight) <= 0) { alert('Please enter a valid declared weight.'); return; }
+      if (!purity)          { alert('Please select the declared purity.');      return; }
+      if (!structure)       { alert('Please select the asset structure.');      return; }
+      if (filesEl.files.length === 0) { alert('Please upload at least one supporting document.'); return; }
+
+      const formData = new FormData();
+      formData.append('applicant_name',  applicant);
+      formData.append('pan_number',      pan);
+      formData.append('declared_weight', weight);
+      formData.append('declared_purity', purity);
+      formData.append('structure',       structure);
+      for (const file of filesEl.files) {
+        formData.append('files', file);
+      }
+
+      const btn = document.getElementById('gold-submit-btn');
+      btn.disabled    = true;
+      btn.textContent = 'Submitting…';
+      document.getElementById('alert-container').innerHTML = '';
+
+      try {
+        const res  = await authFetch('/api/assets/gold', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showAlert('alert-container', data.detail || 'Submission failed. Please try again.', 'error');
+          return;
+        }
+
+        showAlert('alert-container', '✔ Gold asset submitted successfully! It is now awaiting digital desk review.', 'success');
+        // Reset form
+        document.getElementById('gold-applicant').value = '';
+        document.getElementById('gold-pan').value       = '';
+        document.getElementById('gold-weight').value    = '';
+        document.getElementById('gold-purity').value    = '';
+        document.getElementById('gold-structure').value = '';
+        filesEl.value = '';
+
+      } catch (err) {
+        showAlert('alert-container', 'Network error. Please check your connection.', 'error');
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = 'Submit Gold Asset';
+      }
+    }
+
+    /* ---- Land submission ---- */
+    async function submitLand() {
+      const applicant = document.getElementById('land-applicant').value.trim();
+      const pan       = document.getElementById('land-pan').value.trim().toUpperCase();
+      const address   = document.getElementById('land-address').value.trim();
+      const lat       = document.getElementById('land-lat').value;
+      const lng       = document.getElementById('land-long').value;
+      const size      = document.getElementById('land-size').value;
+      const landUse   = document.getElementById('land-use').value;
+      const filesEl   = document.getElementById('land-files');
+
+      if (!applicant) { alert('Please enter the applicant name.');   return; }
+      if (!pan)       { alert('Please enter the PAN number.');        return; }
+      if (!address)   { alert('Please enter the property address.');  return; }
+      if (!lat)       { alert('Please enter the GPS latitude.');      return; }
+      if (!lng)       { alert('Please enter the GPS longitude.');     return; }
+      if (!size || parseFloat(size) <= 0) { alert('Please enter a valid declared size.'); return; }
+      if (!landUse)   { alert('Please select the land use type.');    return; }
+      if (filesEl.files.length === 0) { alert('Please upload at least one supporting document.'); return; }
+
+      const formData = new FormData();
+      formData.append('applicant_name',   applicant);
+      formData.append('pan_number',       pan);
+      formData.append('property_address', address);
+      formData.append('gps_lat',          lat);
+      formData.append('gps_long',         lng);
+      formData.append('declared_size',    size);
+      formData.append('land_use_type',    landUse);
+      for (const file of filesEl.files) {
+        formData.append('files', file);
+      }
+
+      const btn = document.getElementById('land-submit-btn');
+      btn.disabled    = true;
+      btn.textContent = 'Submitting…';
+      document.getElementById('alert-container').innerHTML = '';
+
+      try {
+        const res  = await authFetch('/api/assets/land', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showAlert('alert-container', data.detail || 'Submission failed. Please try again.', 'error');
+          return;
+        }
+
+        showAlert('alert-container', '✔ Land asset submitted successfully! It is now awaiting digital desk review.', 'success');
+        // Reset form
+        document.getElementById('land-applicant').value = '';
+        document.getElementById('land-pan').value       = '';
+        document.getElementById('land-address').value   = '';
+        document.getElementById('land-lat').value       = '';
+        document.getElementById('land-long').value      = '';
+        document.getElementById('land-size').value      = '';
+        document.getElementById('land-use').value       = '';
+        filesEl.value = '';
+
+      } catch (err) {
+        showAlert('alert-container', 'Network error. Please check your connection.', 'error');
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = 'Submit Land Asset';
+      }
+    }
+  </script>
+</body>
+</html>

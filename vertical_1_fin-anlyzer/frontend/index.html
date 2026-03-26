@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financial Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────────────── -->
+  <header class="app-header">
+    <div class="header-left">
+      <span class="logo-mark">▲</span>
+      <span class="app-title">FCC</span>
+      <span class="app-subtitle">Financial Command Center</span>
+    </div>
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn" data-tab="ledger">Ledger</button>
+      <button class="tab-btn" data-tab="ai">AI Strategist</button>
+    </nav>
+    <div class="header-right">
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-text" id="statusText">connecting</span>
+    </div>
+  </header>
+
+  <!-- ── Main ────────────────────────────────────────────────────── -->
+  <main class="app-main">
+
+    <!-- TAB 1: Dashboard -->
+    <section class="tab-panel active" id="tab-dashboard">
+
+      <!-- Summary strip -->
+      <div class="summary-strip">
+        <div class="summary-card">
+          <span class="summary-label">Total Assets</span>
+          <span class="summary-value" id="sumAssets">—</span>
+        </div>
+        <div class="summary-card negative">
+          <span class="summary-label">Pending Outflows</span>
+          <span class="summary-value" id="sumPayables">—</span>
+        </div>
+        <div class="summary-card positive">
+          <span class="summary-label">Expected Inflows</span>
+          <span class="summary-value" id="sumReceivables">—</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Net Position</span>
+          <span class="summary-value" id="sumNet">—</span>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <span class="chart-title">30-Day Liquidity Projection</span>
+          <span class="chart-note" id="chartNote">loading...</span>
+        </div>
+        <canvas id="projectionChart" height="90"></canvas>
+      </div>
+
+      <!-- Bottom two-col -->
+      <div class="dashboard-grid">
+
+        <!-- Outflows -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Pending Outflows</span>
+            <span class="panel-count" id="payableCount">0</span>
+          </div>
+          <div class="panel-list" id="payablesList">
+            <div class="empty-state">No pending payables</div>
+          </div>
+        </div>
+
+        <!-- Inflows -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Expected Inflows</span>
+            <span class="panel-count" id="receivableCount">0</span>
+          </div>
+          <div class="panel-list" id="receivablesList">
+            <div class="empty-state">No pending receivables</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 2: Ledger -->
+    <section class="tab-panel" id="tab-ledger">
+      <div class="ledger-layout">
+
+        <!-- Add entry form -->
+        <div class="form-panel">
+          <div class="panel-header">
+            <span class="panel-title">Add Entry</span>
+          </div>
+          <div class="form-body">
+            <div class="field-group">
+              <label class="field-label">Entry Type</label>
+              <select id="entryType" class="field-input">
+                <option value="asset">Asset</option>
+                <option value="payable">Payable</option>
+                <option value="receivable">Receivable</option>
+              </select>
+            </div>
+
+            <!-- Asset fields -->
+            <div id="fields-asset" class="dynamic-fields">
+              <div class="field-group">
+                <label class="field-label">Asset Name</label>
+                <input type="text" id="asset-name" class="field-input" placeholder="e.g. HDFC Savings" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Type</label>
+                <select id="asset-type" class="field-input">
+                  <option value="Cash">Cash</option>
+                  <option value="Bank">Bank</option>
+                  <option value="Gold">Gold</option>
+                  <option value="Land">Land</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Value (₹)</label>
+                <input type="number" id="asset-value" class="field-input" placeholder="0.00" min="0" step="0.01" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Liquidity Score <span class="hint">(1 = illiquid · 5 = instant)</span></label>
+                <input type="number" id="asset-liquidity" class="field-input" placeholder="3" min="1" max="5" />
+              </div>
+            </div>
+
+            <!-- Payable fields -->
+            <div id="fields-payable" class="dynamic-fields hidden">
+              <div class="field-group">
+                <label class="field-label">Creditor</label>
+                <input type="text" id="payable-creditor" class="field-input" placeholder="e.g. ICICI Bank EMI" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Amount (₹)</label>
+                <input type="number" id="payable-amount" class="field-input" placeholder="0.00" min="0.01" step="0.01" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Due Date</label>
+                <input type="datetime-local" id="payable-due" class="field-input" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Penalty Fee (₹)</label>
+                <input type="number" id="payable-penalty" class="field-input" placeholder="0.00" min="0" step="0.01" />
+              </div>
+            </div>
+
+            <!-- Receivable fields -->
+            <div id="fields-receivable" class="dynamic-fields hidden">
+              <div class="field-group">
+                <label class="field-label">Source</label>
+                <input type="text" id="rec-source" class="field-input" placeholder="e.g. Client Invoice #42" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Amount (₹)</label>
+                <input type="number" id="rec-amount" class="field-input" placeholder="0.00" min="0.01" step="0.01" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Expected Date</label>
+                <input type="datetime-local" id="rec-date" class="field-input" />
+              </div>
+              <div class="field-group">
+                <label class="field-label">Confidence</label>
+                <select id="rec-confidence" class="field-input">
+                  <option value="High">High</option>
+                  <option value="Med">Med</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="formError" class="form-error hidden"></div>
+            <button class="btn-primary" id="submitEntry">Add Entry</button>
+          </div>
+        </div>
+
+        <!-- Assets table -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Assets</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Name</th><th>Type</th><th>Value</th><th>Liquidity</th></tr>
+              </thead>
+              <tbody id="assetsTable">
+                <tr><td colspan="4" class="empty-state">No assets recorded</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 3: AI Strategist -->
+    <section class="tab-panel" id="tab-ai">
+      <div class="ai-layout">
+        <div class="chat-panel">
+          <div class="panel-header">
+            <span class="panel-title">AI Strategist</span>
+            <span class="ai-badge">Qwen3-VL</span>
+          </div>
+
+          <!-- Drop zone overlay -->
+          <div class="drop-overlay hidden" id="dropOverlay">
+            <div class="drop-inner">
+              <span class="drop-icon">↓</span>
+              <span class="drop-text">Drop document to analyze</span>
+              <span class="drop-sub">PDF · PNG · JPG · WEBP</span>
+            </div>
+          </div>
+
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-msg assistant">
+              <div class="msg-bubble">
+                Hello. I have full visibility into your financial state. Ask me anything — or drop a document to extract data automatically.
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-input-row">
+            <input type="file" id="chatFileAttach" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" />
+            <button class="btn-attach" id="attachBtn" title="Attach document">📎</button>
+            <input type="text" id="chatInput" class="chat-input" placeholder="Ask about your finances…" />
+            <button class="btn-attach" id="promptToggleBtn" title="System prompt (off)" data-active="false">🤖</button>
+            <button class="btn-send" id="sendBtn">→</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── Payment Modal ────────────────────────────────────────────── -->
+  <div class="modal-backdrop hidden" id="payModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Process Payment</span>
+        <button class="modal-close" id="closePayModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-detail" id="modalPayDetail"></div>
+        <div class="field-group">
+          <label class="field-label">Asset Allocations</label>
+          <div id="allocationContainer"></div>
+          <button class="btn-ghost" id="addSplitBtn" style="margin-top:8px;width:100%;font-size:13px;">+ Add Asset Split</button>
+        </div>
+        <div id="modalError" class="form-error hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" id="cancelPayModal">Cancel</button>
+        <button class="btn-primary" id="confirmPayBtn">Confirm Payment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Receive Modal ────────────────────────────────────────────── -->
+  <div class="modal-backdrop hidden" id="recModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Record Income</span>
+        <button class="modal-close" id="closeRecModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-detail" id="modalRecDetail"></div>
+        <div class="field-group">
+          <label class="field-label">Credit to Asset</label>
+          <select id="modalRecAssetSelect" class="field-input"></select>
+        </div>
+        <div id="modalRecError" class="form-error hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" id="cancelRecModal">Cancel</button>
+        <button class="btn-primary" id="confirmRecBtn">Confirm Receipt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Toast ────────────────────────────────────────────────────── -->
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>

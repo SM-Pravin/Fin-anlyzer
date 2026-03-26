@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VaultVerify – Certificate Lookup</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="cert-shell">
+    <div class="cert-box">
+
+      <!-- Header -->
+      <div style="text-align:center; margin-bottom:32px;">
+        <div style="font-size:22px; font-weight:700; margin-bottom:4px;">🔐 VaultVerify</div>
+        <div style="font-size:13px; color:var(--text-muted);">Certificate Verification Portal &mdash; Public Access</div>
+      </div>
+
+      <!-- Search bar -->
+      <div class="card" style="margin-bottom:24px;">
+        <label for="cert-id-input" style="font-weight:600; margin-bottom:8px; display:block;">
+          Enter Certificate ID
+        </label>
+        <div style="display:flex; gap:10px;">
+          <input
+            type="text"
+            id="cert-id-input"
+            placeholder="e.g. 3f9a1b2c-0d4e-5f6a-7b8c-9d0e1f2a3b4c"
+            style="flex:1; font-family:monospace;"
+          />
+          <button class="btn btn-primary" onclick="lookupCert()">Verify</button>
+        </div>
+        <p class="text-xs text-muted" style="margin-top:8px;">
+          Certificate IDs are provided upon successful asset certification.
+        </p>
+      </div>
+
+      <div id="alert-container"></div>
+
+      <!-- Result panel (hidden until found) -->
+      <div id="cert-result" style="display:none;">
+
+        <!-- Stamp -->
+        <div class="cert-stamp">
+          <div class="cert-stamp-icon" id="cert-icon">📋</div>
+          <div>
+            <div class="cert-stamp-title">Verified Certificate</div>
+            <div class="cert-stamp-id" id="cert-id-display"></div>
+          </div>
+          <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+            <span class="badge badge-cert">CERTIFIED</span>
+            <button class="btn btn-primary btn-sm" id="download-btn" onclick="downloadPdf()">
+              ⬇ Download PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Applicant & Dates -->
+        <div class="cert-field-grid">
+          <div class="cert-field">
+            <div class="cert-field-label">Applicant Name</div>
+            <div class="cert-field-value" id="r-name"></div>
+          </div>
+          <div class="cert-field">
+            <div class="cert-field-label">PAN Number</div>
+            <div class="cert-field-value font-mono" id="r-pan"></div>
+          </div>
+          <div class="cert-field">
+            <div class="cert-field-label">Asset Type</div>
+            <div class="cert-field-value" id="r-type"></div>
+          </div>
+          <div class="cert-field">
+            <div class="cert-field-label">Submitted On</div>
+            <div class="cert-field-value" id="r-submitted"></div>
+          </div>
+          <div class="cert-field">
+            <div class="cert-field-label">Certified On</div>
+            <div class="cert-field-value" id="r-certified"></div>
+          </div>
+        </div>
+
+        <!-- Asset-specific section -->
+        <div id="asset-details" style="margin-top:16px;"></div>
+
+        <!-- Documents -->
+        <div class="card" style="margin-top:16px; padding:16px 20px;">
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Supporting Documents</div>
+          <div id="r-docs"></div>
+        </div>
+
+        <p class="text-xs text-muted" style="text-align:center; margin-top:20px;">
+          This certificate is digitally issued by VaultVerify. PAN is partially masked for privacy.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    let _currentCertId = null;
+
+    /* Check for cert_id in URL query string on load */
+    window.onload = function () {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (id) {
+        document.getElementById('cert-id-input').value = id;
+        lookupCert();
+      }
+    };
+
+    async function lookupCert() {
+      const certId = document.getElementById('cert-id-input').value.trim();
+      document.getElementById('alert-container').innerHTML = '';
+      document.getElementById('cert-result').style.display = 'none';
+      _currentCertId = null;
+
+      if (!certId) {
+        showAlert('alert-container', 'Please enter a Certificate ID.', 'error');
+        return;
+      }
+
+      try {
+        const res  = await fetch(`/api/certified/${encodeURIComponent(certId)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          showAlert('alert-container',
+            data.detail || 'Certificate not found. Please check the ID and try again.',
+            'error');
+          return;
+        }
+
+        _currentCertId = certId;
+        renderCert(data);
+        document.getElementById('cert-result').style.display = 'block';
+      } catch (err) {
+        showAlert('alert-container', 'Network error. Please try again.', 'error');
+      }
+    }
+
+    function renderCert(d) {
+      const isGold = d.asset_type === 'gold';
+
+      document.getElementById('cert-icon').textContent     = isGold ? '🥇' : '🏞';
+      document.getElementById('cert-id-display').textContent = d.certificate_id;
+      document.getElementById('r-name').textContent        = d.applicant_name;
+      document.getElementById('r-pan').textContent         = d.pan_number;
+      document.getElementById('r-type').textContent        = isGold ? '🥇 Gold' : '🏞 Land';
+      document.getElementById('r-submitted').textContent   = formatDate(d.submitted_at);
+      document.getElementById('r-certified').textContent   = formatDate(d.certified_on);
+
+      const detailsEl = document.getElementById('asset-details');
+      if (isGold) {
+        detailsEl.innerHTML = `
+          <div class="cert-field-grid">
+            <div class="cert-field">
+              <div class="cert-field-label">Declared Weight</div>
+              <div class="cert-field-value">${d.declared_weight != null ? d.declared_weight + ' g' : '—'}</div>
+            </div>
+            <div class="cert-field">
+              <div class="cert-field-label">Measured Weight</div>
+              <div class="cert-field-value">${d.measured_weight != null ? d.measured_weight + ' g' : '—'}</div>
+            </div>
+            <div class="cert-field">
+              <div class="cert-field-label">Declared Purity</div>
+              <div class="cert-field-value">${d.declared_purity || '—'}</div>
+            </div>
+            <div class="cert-field">
+              <div class="cert-field-label">Tested Purity</div>
+              <div class="cert-field-value">${d.tested_purity || '—'}</div>
+            </div>
+            <div class="cert-field">
+              <div class="cert-field-label">Form / Structure</div>
+              <div class="cert-field-value">${d.structure || '—'}</div>
+            </div>
+          </div>
+        `;
+      } else {
+        detailsEl.innerHTML = `
+          <div class="cert-field-grid">
+            <div class="cert-field" style="grid-column:1/-1;">
+              <div class="cert-field-label">Property Address</div>
+              <div class="cert-field-value">${escHtml(d.property_address || '—')}</div>
+            </div>
+            <div class="cert-field">
+              <div class="cert-field-label">GPS Latitude</div>
+              <div class="cert-field-value font-mono">${d.gps_lat != null ? d.gps_lat : '—'}</div>
+            </div>
+            <div class="cert-field">
+              <div class="cert-field-label">GPS Longitude</div>
+              <div class="cert-field-value font-mono">${d.gps_long != null ? d.gps_long : '—'}</div>
+            </div>
+            <div class="cert-field">
+              <div class="cert-field-label">Declared Size</div>
+              <div class="cert-field-value">${d.declared_size != null ? d.declared_size + ' sq. ft.' : '—'}</div>
+            </div>
+            <div class="cert-field">
+              <div class="cert-field-label">Land Use Type</div>
+              <div class="cert-field-value">${escHtml(d.land_use_type || '—')}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      document.getElementById('r-docs').innerHTML = docLinks(d.document_urls);
+    }
+
+    /* ── PDF Download ──────────────────────────────────────────────────────── */
+    async function downloadPdf() {
+      if (!_currentCertId) return;
+
+      const btn = document.getElementById('download-btn');
+      btn.disabled    = true;
+      btn.textContent = 'Generating…';
+
+      try {
+        const res = await fetch(`/api/certified/${encodeURIComponent(_currentCertId)}/pdf`);
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showAlert('alert-container', data.detail || 'Failed to generate PDF.', 'error');
+          return;
+        }
+
+        // Trigger browser file download
+        const blob   = await res.blob();
+        const url    = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href     = url;
+        anchor.download = `VaultVerify_Certificate_${_currentCertId.slice(0, 8)}.pdf`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+
+      } catch (err) {
+        showAlert('alert-container', 'Network error while downloading PDF.', 'error');
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = '⬇ Download PDF';
+      }
+    }
+
+    /* Allow pressing Enter to search */
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') lookupCert();
+    });
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>

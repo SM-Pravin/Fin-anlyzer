@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VaultVerify</title>
+</head>
+<body>
+  <script>
+    // Redirect based on stored role, or fall back to login
+    const role  = localStorage.getItem('role');
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      window.location.href = '/static/login.html';
+    } else if (role === 'admin') {
+      window.location.href = '/static/admin.html';
+    } else if (role === 'agent') {
+      window.location.href = '/static/field.html';
+    } else {
+      window.location.href = '/static/user.html';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VaultVerify – Login</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-box">
+      <div class="login-logo">🔐 VaultVerify</div>
+      <div class="login-tagline">Enterprise Collateral Verification System</div>
+
+      <div id="alert-container"></div>
+
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input
+          type="text"
+          id="username"
+          placeholder="Enter your username"
+          autocomplete="username"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          placeholder="Enter your password"
+          autocomplete="current-password"
+        />
+      </div>
+
+      <button class="btn btn-primary w-full" id="login-btn" onclick="doLogin()">
+        Sign In
+      </button>
+
+      <p class="text-sm text-muted mt-4" style="text-align:center">
+        Default credentials: admin / agent / user &nbsp;·&nbsp; Password: <code>password</code>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // If already authenticated, skip login
+    (function () {
+      const token = localStorage.getItem('token');
+      const role  = localStorage.getItem('role');
+      if (token && role) {
+        const dest = role === 'admin' ? '/static/admin.html'
+                   : role === 'agent' ? '/static/field.html'
+                   : '/static/user.html';
+        window.location.href = dest;
+      }
+    })();
+
+    function showError(msg) {
+      const c = document.getElementById('alert-container');
+      c.innerHTML = `<div class="alert alert-error">${msg}</div>`;
+    }
+
+    async function doLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const btn      = document.getElementById('login-btn');
+
+      if (!username) { showError('Please enter your username.'); return; }
+      if (!password) { showError('Please enter your password.'); return; }
+
+      btn.disabled    = true;
+      btn.textContent = 'Signing in…';
+      document.getElementById('alert-container').innerHTML = '';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ username, password }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(data.detail || 'Login failed. Check your credentials.');
+          return;
+        }
+
+        // Persist token and user metadata
+        localStorage.setItem('token',    data.access_token);
+        localStorage.setItem('role',     data.role);
+        localStorage.setItem('username', username);
+
+        // Redirect based on role
+        if (data.role === 'admin') {
+          window.location.href = '/static/admin.html';
+        } else if (data.role === 'agent') {
+          window.location.href = '/static/field.html';
+        } else {
+          window.location.href = '/static/user.html';
+        }
+      } catch (err) {
+        showError('Network error. Is the server running?');
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = 'Sign In';
+      }
+    }
+
+    // Allow pressing Enter to submit
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') doLogin();
+    });
+  </script>
+</body>
+</html>
